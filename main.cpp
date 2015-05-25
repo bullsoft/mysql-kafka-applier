@@ -37,5 +37,6 @@ int main() {
     while(true) {
         if(binlog.get_next_event() != ERR_OK) break;
     }
+    binlog.disconnect();
     return 0;
 }

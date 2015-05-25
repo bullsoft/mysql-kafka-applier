@@ -5,7 +5,6 @@
 #include "BinlogEvent.h"
 
 #include <iomanip>
-#include <iostream>
 
 using std::string;
 using std::map;
@@ -72,12 +71,11 @@ int BinlogEvent::connect(std::string uri) {
     int error_number = m_binlog->connect();
 
     if (const char* msg = str_error(error_number)) {
-        std::cerr << msg << std::endl;
+        throw new std::runtime_error(std::string(msg));
     }
 
     if (error_number != ERR_OK) {
-        std::cerr << "Unable to setup connection" << std::endl;
-        return 1;
+        throw new std::runtime_error("Unable to setup conneciton");
     }
 }
 
@@ -109,10 +107,9 @@ int BinlogEvent::get_next_event() {
     error_number = m_drv->get_next_event(&buffer_buflen);
 
     if (error_number == ERR_OK) {
-        const char *error= NULL;
+        const char *error = NULL;
         if (!(event = decode.decode_event((char*)buffer_buflen.first, buffer_buflen.second, &error, 1))) {
-            std::cerr << error << std::endl;
-            throw std::runtime_error("can not decode event");
+            throw std::runtime_error("can not decode event: " + std::string(error));
         }
     } else {
         const char* msg = str_error(error_number);
@@ -150,15 +147,14 @@ int BinlogEvent::get_next_event() {
 
         if (event->get_event_type() == binary_log::TABLE_MAP_EVENT) {
             Table_map_event *table_map_event = static_cast<Table_map_event*>(event);
-            database_dot_table = table_map_event->m_dbnam;
+            database_dot_table = table_map_event->get_db_name();
             database_dot_table.append(".");
-            database_dot_table.append(table_map_event->m_tblnam);
+            database_dot_table.append(table_map_event->get_table_name());
             m_tid_tname[table_map_event->get_table_id()]= database_dot_table;
         } else {
             // It is a row event
             Rows_event *row_event= static_cast<Rows_event*>(event);
-            // tb_it = m_tid_tname.begin();
-            m_tid_tname.begin();
+            tb_it = m_tid_tname.begin();
             tb_it = m_tid_tname.find(row_event->get_table_id());
             if (tb_it != m_tid_tname.end())
             {
@@ -177,7 +173,7 @@ int BinlogEvent::get_next_event() {
         << (event->header())->data_written
         << event_types[(event->get_event_type())]
         << "[" << event->get_event_type()
-        << "] - " << database_dot_table
+        << "]"
         << std::endl;
         cout << "Event Info: ";
         event->print_long_info(cout);
