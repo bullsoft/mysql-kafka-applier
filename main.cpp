@@ -25,6 +25,7 @@ int main() {
     BinlogEvent binlog;
     binlog.connect(std::string("mysql://root@127.0.0.1:3306"));
     binlog.set_position(2392);
+
     cout << setw(17) << left
     << "Start Position"
     << setw(15) << left

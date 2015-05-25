@@ -16,6 +16,11 @@ using binary_log::Binary_log;
 using binary_log::system::create_transport;
 using binary_log::system::Binary_log_driver;
 
+typedef std::vector<Value>::iterator RowofFieldsIterator;
+
+std::pair<unsigned char *, size_t> buffer_buflen;
+Decoder decode;
+
 std::string event_types[] = {
         "Unknown",
         "Start_v3",
@@ -101,9 +106,6 @@ int BinlogEvent::get_next_event() {
     int error_number;
     const char *error = NULL;
 
-    Decoder decode(1);
-    std::pair<unsigned char *, size_t> buffer_buflen;
-
     error_number = m_drv->get_next_event(&buffer_buflen);
 
     if (error_number == ERR_OK) {
@@ -146,15 +148,15 @@ int BinlogEvent::get_next_event() {
         map<int, string>::iterator tb_it;
 
         if (event->get_event_type() == binary_log::TABLE_MAP_EVENT) {
-            Table_map_event *table_map_event = static_cast<Table_map_event*>(event);
-            database_dot_table = table_map_event->get_db_name();
+            m_tm_event = static_cast<Table_map_event*>(event);
+            database_dot_table = m_tm_event->get_db_name();
             database_dot_table.append(".");
-            database_dot_table.append(table_map_event->get_table_name());
-            m_tid_tname[table_map_event->get_table_id()]= database_dot_table;
+            database_dot_table.append(m_tm_event->get_table_name());
+            m_tid_tname[m_tm_event->get_table_id()]= database_dot_table;
         } else {
             // It is a row event
             Rows_event *row_event= static_cast<Rows_event*>(event);
-            tb_it = m_tid_tname.begin();
+            m_tid_tname.begin();
             tb_it = m_tid_tname.find(row_event->get_table_id());
             if (tb_it != m_tid_tname.end())
             {
@@ -162,6 +164,34 @@ int BinlogEvent::get_next_event() {
                 if (row_event->get_flags() == Rows_event::STMT_END_F) {
                     m_tid_tname.erase(tb_it);
                 }
+            }
+
+            Converter converter;
+            Row_event_set rows(row_event, m_tm_event);
+            try
+            {
+                Row_event_set::iterator it = rows.begin();
+                do
+                {
+                    Row_of_fields fields = *it;
+                    if (row_event->get_event_type() == binary_log::WRITE_ROWS_EVENT ||
+                        row_event->get_event_type() == binary_log::WRITE_ROWS_EVENT_V1) {
+                        RowofFieldsIterator field_it = fields.begin();
+                        std::cout << ", data: ";
+                        do {
+
+                            std::string str;
+                            converter.to(str, *field_it);
+                            std::cout << str << "\t";
+
+                        } while(++field_it != fields.end());
+                        std::cout << std::endl;
+                    }
+                } while (++it != rows.end());
+            }
+            catch (const std::logic_error& le)
+            {
+                std::cerr << "MySQL Data Type error: " << le.what() << '\n';
             }
         }
 
@@ -190,4 +220,8 @@ BinlogEvent::~BinlogEvent() {
 
 BinlogEvent::BinlogEvent() {
 
+}
+
+Binary_log *BinlogEvent::get_raw() {
+    return m_binlog;
 }

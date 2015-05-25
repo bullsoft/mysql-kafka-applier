@@ -17,13 +17,13 @@ public:
     ~BinlogEvent();
 
     std::string get_event_type_str(Log_event_type type);
-
     int get_number_of_events();
 
     int connect(std::string uri);
     int disconnect();
     int set_position(unsigned long start);
     int get_next_event();
+    Binary_log *get_raw();
 
 private:
     Binary_log_driver *m_drv;
@@ -31,6 +31,7 @@ private:
     unsigned long m_start_position;
     unsigned long m_now_position;
     std::map<int, std::string> m_tid_tname;
+    Table_map_event *m_tm_event;
 };
 
 
