@@ -16,7 +16,7 @@ using binary_log::Binary_log;
 using binary_log::system::create_transport;
 using binary_log::system::Binary_log_driver;
 
-typedef std::vector<Value>::iterator RowofFieldsIterator;
+typedef std::vector<Value >::iterator Row_of_fields_Iterator;
 
 std::pair<unsigned char *, size_t> buffer_buflen;
 Decoder decode;
@@ -164,6 +164,8 @@ int BinlogEvent::get_next_event() {
                 if (row_event->get_flags() == Rows_event::STMT_END_F) {
                     m_tid_tname.erase(tb_it);
                 }
+            } else {
+                throw new std::runtime_error("can not find db.table");
             }
 
             Converter converter;
@@ -176,8 +178,8 @@ int BinlogEvent::get_next_event() {
                     Row_of_fields fields = *it;
                     if (row_event->get_event_type() == binary_log::WRITE_ROWS_EVENT ||
                         row_event->get_event_type() == binary_log::WRITE_ROWS_EVENT_V1) {
-                        RowofFieldsIterator field_it = fields.begin();
-                        std::cout << ", data: ";
+                        Row_of_fields_Iterator field_it = fields.begin();
+                        std::cout << " , database.table: " << database_dot_table << ", data: ";
                         do {
 
                             std::string str;
@@ -194,6 +196,7 @@ int BinlogEvent::get_next_event() {
                 std::cerr << "MySQL Data Type error: " << le.what() << '\n';
             }
         }
+
 
         cout << setw(17) << left
         << m_start_position
