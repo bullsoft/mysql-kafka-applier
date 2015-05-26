@@ -22,7 +22,7 @@ public:
     int connect(std::string uri);
     int disconnect();
     int set_position(unsigned long start);
-    int get_next_event();
+    std::string get_next_event();
     Binary_log *get_raw();
 
 private:

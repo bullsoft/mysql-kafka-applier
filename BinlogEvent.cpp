@@ -5,6 +5,8 @@
 #include "BinlogEvent.h"
 
 #include <iomanip>
+#include <stdio.h>
+#include <stdlib.h>
 
 using std::string;
 using std::map;
@@ -99,7 +101,7 @@ int BinlogEvent::set_position(unsigned long start_pos) {
     m_start_position = start_pos;
 }
 
-int BinlogEvent::get_next_event() {
+std::string BinlogEvent::get_next_event() {
     Binary_log_event *event;
     string database_dot_table;
 
@@ -115,7 +117,6 @@ int BinlogEvent::get_next_event() {
         }
     } else {
         const char* msg = str_error(error_number);
-        std::cerr << msg << std::endl;
         throw std::runtime_error("get next event error");
     }
 
@@ -133,6 +134,13 @@ int BinlogEvent::get_next_event() {
     } else {
         m_now_position = (event->header()->log_pos) - (event->header())->data_written;
     }
+
+    std::string e_str;
+    char buf[33];
+    e_str = "{\"event\":\"";
+    e_str.append(event_types[(event->get_event_type())] + "\"");
+    sprintf(buf, ", \"position\": %ld", (event->header())->log_pos);
+    e_str.append(buf);
 
     if(event->get_event_type() == binary_log::TABLE_MAP_EVENT ||
        event->get_event_type() == binary_log::PRE_GA_WRITE_ROWS_EVENT ||
@@ -161,6 +169,7 @@ int BinlogEvent::get_next_event() {
             if (tb_it != m_tid_tname.end())
             {
                 database_dot_table = tb_it->second;
+                database_dot_table.pop_back();
                 if (row_event->get_flags() == Rows_event::STMT_END_F) {
                     m_tid_tname.erase(tb_it);
                 }
@@ -170,48 +179,47 @@ int BinlogEvent::get_next_event() {
 
             Converter converter;
             Row_event_set rows(row_event, m_tm_event);
-            try
-            {
+
+            e_str.append(", \"table\":\"" + database_dot_table + "\"");
+            e_str.append(", \"data\":");
+
+            try {
+                e_str.append("[");
                 Row_event_set::iterator it = rows.begin();
                 do
                 {
                     Row_of_fields fields = *it;
-                    if (row_event->get_event_type() == binary_log::WRITE_ROWS_EVENT ||
-                        row_event->get_event_type() == binary_log::WRITE_ROWS_EVENT_V1) {
-                        Row_of_fields_Iterator field_it = fields.begin();
-                        std::cout << " , database.table: " << database_dot_table << ", data: ";
-                        do {
+                    Row_of_fields_Iterator field_it = fields.begin();
 
-                            std::string str;
-                            converter.to(str, *field_it);
-                            std::cout << str << "\t";
+                    e_str.append("[");
 
-                        } while(++field_it != fields.end());
-                        std::cout << std::endl;
-                    }
+                    do {
+                        std::string str;
+                        converter.to(str, *field_it);
+
+                        e_str.append("\"" + str + "\"");
+
+                        if (field_it != fields.end()) {
+                            e_str.append(",");
+                        }
+
+                    } while(++field_it != fields.end());
+
+                    e_str.erase(e_str.end() - 1);
+                    e_str.append("]");
+                    e_str.append(",");
+
                 } while (++it != rows.end());
-            }
-            catch (const std::logic_error& le)
-            {
+            } catch (const std::logic_error& le) {
                 std::cerr << "MySQL Data Type error: " << le.what() << '\n';
             }
+            e_str.erase(e_str.end() - 1);
+            e_str.append("]");
         }
-
-
-        cout << setw(17) << left
-        << m_start_position
-        << setw(15) << left
-        << (event->header())->log_pos
-        << setw(15) << left
-        << (event->header())->data_written
-        << event_types[(event->get_event_type())]
-        << "[" << event->get_event_type()
-        << "]"
-        << std::endl;
-        cout << "Event Info: ";
-        event->print_long_info(cout);
     }
-    return 0;
+
+    e_str.append("}");
+    return e_str;
 }
 
 BinlogEvent::~BinlogEvent() {

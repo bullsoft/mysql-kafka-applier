@@ -26,18 +26,14 @@ int main() {
     binlog.connect(std::string("mysql://root@127.0.0.1:3306"));
     binlog.set_position(2392);
 
-    cout << setw(17) << left
-    << "Start Position"
-    << setw(15) << left
-    << "End Position"
-    << setw(15) << left
-    << "Event Length"
-    << setw(25) << left
-    << "Event Type"
-    << endl;
     while(true) {
-        if(binlog.get_next_event() != ERR_OK) break;
+        std::string msg;
+        try {
+            msg = binlog.get_next_event();
+        }catch(const std::exception& e) {
+            binlog.disconnect();
+            return 1;
+        }
+        std::cout << msg << std::endl;
     }
-    binlog.disconnect();
-    return 0;
 }
