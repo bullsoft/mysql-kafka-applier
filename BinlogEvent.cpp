@@ -91,16 +91,6 @@ int BinlogEvent::disconnect() {
     return 0;
 }
 
-int BinlogEvent::set_position(unsigned long start_pos) {
-    if (start_pos > MAX_BINLOG_POSITION) {
-        throw new std::runtime_error("Illegal binlog start position");
-    };
-    if(m_binlog->set_position(start_pos) != ERR_OK) {
-        throw new std::runtime_error("The specified position can not be set");
-    }
-    m_start_position = start_pos;
-}
-
 std::string BinlogEvent::get_next_event() {
     Binary_log_event *event;
     string database_dot_table;

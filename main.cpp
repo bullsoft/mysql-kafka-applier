@@ -24,9 +24,15 @@ int main() {
 
     BinlogEvent binlog;
     binlog.connect(std::string("mysql://root@127.0.0.1:3306"));
-    binlog.set_position(2392);
-
+    binlog.get_raw()->set_position(2392);
     while(true) {
+        std::string binlog_filename;
+        unsigned long pos;
+
+        binlog.get_raw()->get_position(binlog_filename);
+        pos = binlog.get_raw()->get_position();
+        std::cout << binlog_filename << ":" << pos << std::endl;
+
         std::string msg;
         try {
             msg = binlog.get_next_event();
