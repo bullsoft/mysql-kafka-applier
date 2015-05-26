@@ -12,34 +12,38 @@ using std::left;
 using namespace std;
 
 int main() {
-    /*
+
     std::string kafka_brokers = "localhost";
     std::string kafka_topic = "test";
 
-    Kafka k(kafka_brokers, kafka_topic);
-    k.produce("hfasdfadf12e2341234");
-    k.produce("1223r231343");
-    k.produce("32454356203-rldmfladlk;dl");
-    */
+    Kafka *k;
+    k = new Kafka(kafka_brokers);
 
-    BinlogEvent binlog;
-    binlog.connect(std::string("mysql://root@127.0.0.1:3306"));
-    binlog.get_raw()->set_position(2392);
+    BinlogEvent *binlog;
+    binlog = new BinlogEvent;
+    binlog->connect(std::string("mysql://root@127.0.0.1:3306"));
+    binlog->get_raw()->set_position(3194);
+
     while(true) {
         std::string binlog_filename;
         unsigned long pos;
 
-        binlog.get_raw()->get_position(binlog_filename);
-        pos = binlog.get_raw()->get_position();
+        binlog->get_raw()->get_position(binlog_filename);
+        pos = binlog->get_raw()->get_position();
+
         std::cout << binlog_filename << ":" << pos << std::endl;
 
         std::string msg;
+
         try {
-            msg = binlog.get_next_event();
+            msg = binlog->get_next_event();
+            k->produce(msg, kafka_topic);
         }catch(const std::exception& e) {
-            binlog.disconnect();
+            std::cout << e.what() << std::endl;
+            binlog->disconnect();
             return 1;
         }
         std::cout << msg << std::endl;
     }
+
 }

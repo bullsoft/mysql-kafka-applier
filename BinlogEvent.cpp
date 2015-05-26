@@ -110,6 +110,9 @@ std::string BinlogEvent::get_next_event() {
         throw std::runtime_error("get next event error");
     }
 
+    /*
+     * 目前没有任何作用
+     */
     if (event->get_event_type() == binary_log::INCIDENT_EVENT ||
         (event->get_event_type() == binary_log::ROTATE_EVENT &&
          event->header()->log_pos == 0 ||

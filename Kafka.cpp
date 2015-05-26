@@ -4,13 +4,12 @@
 
 #include "Kafka.h"
 
-Kafka::Kafka(std::string brokers, std::string topic)
+Kafka::Kafka(std::string brokers)
 {
     std::string err_str;
     m_partition = RdKafka::Topic::PARTITION_UA;
 
     RdKafka::Conf *conf = RdKafka::Conf::create(RdKafka::Conf::CONF_GLOBAL);
-    RdKafka::Conf *tconf = RdKafka::Conf::create(RdKafka::Conf::CONF_TOPIC);
 
     conf->set("metadata.broker.list", brokers, err_str);
 
@@ -26,14 +25,18 @@ Kafka::Kafka(std::string brokers, std::string topic)
         exit(1);
     }
     std::cout << "% Created producer " << k_producer->name() << std::endl;
+
+}
+
+int Kafka::produce(std::string msg, std::string topic) {
+    std::string err_str;
+    RdKafka::Conf *tconf = RdKafka::Conf::create(RdKafka::Conf::CONF_TOPIC);
     k_topic = RdKafka::Topic::create(k_producer, topic, tconf, err_str);
     if (!k_topic) {
         std::cerr << "Failed to create topic: " << err_str << std::endl;
         exit(1);
     }
-}
 
-int Kafka::produce(std::string msg) {
     RdKafka::ErrorCode resp =
             k_producer->produce(k_topic, m_partition,
                                 RdKafka::Producer::RK_MSG_COPY /* Copy payload */,

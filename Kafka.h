@@ -52,10 +52,10 @@ public:
 
 class Kafka {
 public:
-    Kafka(std::string brokers, std::string topic);
+    Kafka(std::string brokers);
     ~Kafka();
 
-    int produce(std::string msg);
+    int produce(std::string msg, std::string topic);
 
 private:
     RdKafka::Topic *k_topic;
