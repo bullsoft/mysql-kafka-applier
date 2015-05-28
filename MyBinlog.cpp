@@ -2,7 +2,8 @@
 // Created by 顾伟刚 on 15/5/13.
 //
 
-#include "BinlogEvent.h"
+#include "MyBinlog.h"
+#include "MyEvent.h"
 
 #include <iomanip>
 #include <stdio.h>
@@ -71,7 +72,7 @@ int get_number_of_events() {
     return sizeof(event_types) / sizeof(event_types[0]);
 }
 
-int BinlogEvent::connect(std::string uri) {
+int MyBinlog::connect(std::string uri) {
     m_drv = create_transport(uri.c_str());
     m_binlog = new Binary_log(m_drv);
 
@@ -86,12 +87,12 @@ int BinlogEvent::connect(std::string uri) {
     }
 }
 
-int BinlogEvent::disconnect() {
+int MyBinlog::disconnect() {
     m_binlog->disconnect();
     return 0;
 }
 
-std::string BinlogEvent::get_next_event() {
+std::string MyBinlog::get_next_event(MyEvent *my_event) {
     Binary_log_event *event;
     string database_dot_table;
 
@@ -110,23 +111,9 @@ std::string BinlogEvent::get_next_event() {
         throw std::runtime_error("get next event error");
     }
 
-    /*
-     * 目前没有任何作用
-     */
-    if (event->get_event_type() == binary_log::INCIDENT_EVENT ||
-        (event->get_event_type() == binary_log::ROTATE_EVENT &&
-         event->header()->log_pos == 0 ||
-         event->header()->log_pos == 0))
-    {
-        /*
-          If the event type is an Incident event or a Rotate event
-          which occurs when a server starts on a fresh binlog file,
-          the event will not be written in the binlog file.
-        */
-        m_now_position = 0;
-    } else {
-        m_now_position = (event->header()->log_pos) - (event->header())->data_written;
-    }
+    my_event->event_type_str =  event_types[(event->get_event_type())];
+    my_event->event_type = event->get_event_type();
+    my_event->position = (event->header())->log_pos;
 
     std::string e_str;
     char buf[33];
@@ -209,23 +196,26 @@ std::string BinlogEvent::get_next_event() {
             e_str.erase(e_str.end() - 1);
             e_str.append("]");
         }
-    }
 
+        my_event->table = database_dot_table;
+    }
     e_str.append("}");
-    return e_str;
+    my_event->message = e_str;
+
+    return "OK";
 }
 
-BinlogEvent::~BinlogEvent() {
+MyBinlog::~MyBinlog() {
     delete m_drv;
     delete m_binlog;
     m_binlog = NULL;
     m_drv = NULL;
 }
 
-BinlogEvent::BinlogEvent() {
+MyBinlog::MyBinlog() {
 
 }
 
-Binary_log *BinlogEvent::get_raw() {
+Binary_log *MyBinlog::get_raw() {
     return m_binlog;
 }

@@ -6,29 +6,29 @@
 #define MYSQL_KAFKA_APPLIER_BINLOGEVENT_H
 
 #include "binlog.h"
+#include "MyEvent.h"
+
 using binary_log::system::Binary_log_driver;
 
 #define MAX_BINLOG_SIZE 1073741824
 #define MAX_BINLOG_POSITION MAX_BINLOG_SIZE/4
 
-class BinlogEvent {
+class MyBinlog {
 public:
-    BinlogEvent();
-    ~BinlogEvent();
+    MyBinlog();
+    ~MyBinlog();
 
     std::string get_event_type_str(Log_event_type type);
     int get_number_of_events();
 
     int connect(std::string uri);
     int disconnect();
-    std::string get_next_event();
+    std::string get_next_event(MyEvent *my_event);
     Binary_log *get_raw();
 
 private:
     Binary_log_driver *m_drv;
     Binary_log *m_binlog;
-    unsigned long m_start_position;
-    unsigned long m_now_position;
     std::map<int, std::string> m_tid_tname;
     Table_map_event *m_tm_event;
 };

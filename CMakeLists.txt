@@ -8,6 +8,6 @@ include_directories("." "/usr/local/include/mysql-binlog-events" "/usr/local/mys
 link_directories("/usr/local/lib" "/usr/lib")
 
 set(SOURCE_FILES main.cpp)
-add_executable(mysql_kafka_applier ${SOURCE_FILES} Kafka.cpp Kafka.h BinlogEvent.cpp BinlogEvent.h)
+add_executable(mysql_kafka_applier ${SOURCE_FILES} Kafka.cpp Kafka.h MyBinlog.cpp MyBinlog.h MyEvent.cpp MyEvent.h)
 
 target_link_libraries(mysql_kafka_applier binlogevents mysqlstream rdkafka++ pthread z)
