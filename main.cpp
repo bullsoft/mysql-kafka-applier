@@ -1,12 +1,9 @@
+#include <iomanip>
+
 #include "MyBinlog.h"
 #include "MyEvent.h"
 #include "Kafka.h"
 #include "MyBinlog.h"
-
-#include <iomanip>
-using std::cout;
-using std::setw;
-using std::left;
 
 using namespace std;
 
