@@ -18,14 +18,14 @@ include_directories(${CMAKE_CURRENT_SOURCe_DIR})
 if (BINLOG_PATH)
     include_directories(${BINLOG_PATH}/include)
     link_directories(${BINLOG_PATH}/lib)
-else
+else (BINLOG_PATH)
     include_directories("/usr/local/include/mysql-binlog-events")
 endif (BINLOG_PATH)
 
 if (MYSQL_PATH)
-    include_directories(${MYSQL_PATH}/include)
+    include_directories("${MYSQL_PATH}/include" "${MYSQL_PATH}/include/mysql")
     link_directories(${MYSQL_PATH}/lib)
-else
+else (MYSQL_PATH)
     include_directories("/usr/local/mysql/include/mysql" "/usr/local/mysql/include")
 endif (MYSQL_PATH)
 
