@@ -1,5 +1,4 @@
 #include "MyBinlog.h"
-#include "MyEvent.h"
 #include "Kafka.h"
 #include "MyBinlog.h"
 
@@ -19,39 +18,29 @@ int main() {
     k = new Kafka(kafka_brokers);
 */
     MyBinlog *binlog;
-    binlog = new MyBinlog;
-    binlog->connect(std::string("mysql://root@127.0.0.1:3306"));
-    binlog->get_raw()->set_position(3194);
+    binlog = new MyBinlog(std::string("mysql://root@127.0.0.1:3306"));
+    int err_code;
+    err_code = binlog->connect();
+    binlog->set_position(16425);
+    std::cout << err_code << std::endl;
 
     bool run = true;
 
     while(run) {
-        std::string binlog_filename;
-        unsigned long pos;
-
-        binlog->get_raw()->get_position(binlog_filename);
-        pos = binlog->get_raw()->get_position();
-
-        std::cout << binlog_filename << ":" << pos << std::endl;
-        std::string msg;
-
         MyEvent* event = new MyEvent();
+        int result;
         try {
-            msg = binlog->get_next_event(event);
+            result = binlog->get_next_event(event);
+            if (result != ERR_OK) {
+                throw new std::runtime_error("failed to get next event");
+            }
+            std::cout << "filename and position: " << binlog->get_filename() << "\t" << binlog->get_position() << std::endl;
+
         }catch(const std::exception& e) {
             std::cout << e.what() << std::endl;
             run = false;
             binlog->disconnect();
         }
-
-        std::cout << event->event_type_str << std::endl;
-
-        if(event->is_data_affected()) {
-            std::cout << event->message << std::endl;
-            // k->produce(msg, kafka_topic);
-        }
-
-        delete event;
     }
 
     delete binlog;

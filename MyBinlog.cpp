@@ -3,7 +3,7 @@
 //
 
 #include "MyBinlog.h"
-#include "MyEvent.h"
+#include "MyContentHandler.h"
 
 #include <iomanip>
 #include <stdio.h>
@@ -19,64 +19,14 @@ using binary_log::Binary_log;
 using binary_log::system::create_transport;
 using binary_log::system::Binary_log_driver;
 
-typedef std::vector<Value >::iterator Row_of_fields_Iterator;
+MyContentHandler contentHandler;
 
-std::pair<unsigned char *, size_t> buffer_buflen;
-Decoder decode;
-
-std::string event_types[] = {
-        "Unknown",
-        "Start_v3",
-        "Query",
-        "Stop",
-        "Rotate",
-        "Intvar",
-        "Load",
-        "Slave",
-        "Create_file",
-        "Append_block",
-        "Exec_load",
-        "Delete_file",
-        "New_load",
-        "RAND",
-        "User var",
-        "Format_desc",
-        "Xid",
-        "Begin_load_query",
-        "Execute_load_query",
-        "Table_map",
-        "Write_rows_event_old",
-        "Update_rows_event_old",
-        "Delete_rows_event_old",
-        "Write_rows_v1",
-        "Update_rows_v1",
-        "Delete_rows_v1",
-        "Incident",
-        "Heartbeat",
-        "Ignorable",
-        "Rows_query",
-        "Write_rows",
-        "Update_rows",
-        "Delete_rows",
-        "Gtid",
-        "Anonymous_Gtid",
-        "Previous_gtids",
-        "User Defined"
-};
-
-std::string get_event_type_str(Log_event_type type) {
-    return event_types[type];
-}
-
-int get_number_of_events() {
-    return sizeof(event_types) / sizeof(event_types[0]);
-}
-
-int MyBinlog::connect(std::string uri) {
-    m_drv = create_transport(uri.c_str());
+int MyBinlog::connect() {
+    m_drv = create_transport(m_uri.c_str());
     m_binlog = new Binary_log(m_drv);
 
-    int error_number = m_binlog->connect();
+    int error_number;
+    error_number = m_binlog->connect();
 
     if (const char* msg = str_error(error_number)) {
         throw new std::runtime_error(std::string(msg));
@@ -85,124 +35,73 @@ int MyBinlog::connect(std::string uri) {
     if (error_number != ERR_OK) {
         throw new std::runtime_error("Unable to setup conneciton");
     }
+
+    m_handler.add_listener(contentHandler);
+
+    std::cout << "Connected ... " << std::endl;
+
+    return ERR_OK;
 }
 
 int MyBinlog::disconnect() {
     m_binlog->disconnect();
-    return 0;
+    return ERR_OK;
 }
 
-std::string MyBinlog::get_next_event(MyEvent *my_event) {
+int MyBinlog::get_next_event(MyEvent *my_event) {
+
     Binary_log_event *event;
-    string database_dot_table;
 
-    int error_number;
-    const char *error = NULL;
-
-    error_number = m_drv->get_next_event(&buffer_buflen);
-
-    if (error_number == ERR_OK) {
-        const char *error = NULL;
-        if (!(event = decode.decode_event((char*)buffer_buflen.first, buffer_buflen.second, &error, 1))) {
-            throw std::runtime_error("can not decode event: " + std::string(error));
+    int result;
+    std::pair<unsigned char *, size_t> buffer_buflen;
+    result = m_drv->get_next_event(&buffer_buflen);
+    if (result == ERR_OK) {
+        if (!(event = m_decode.decode_event((char *) buffer_buflen.first, buffer_buflen.second, NULL, 1))) {
+            return ERR_FAIL;
         }
-    } else {
-        const char* msg = str_error(error_number);
-        throw std::runtime_error("get next event error");
+    }
+    else {
+        return ERR_FAIL;
     }
 
-    my_event->event_type_str =  event_types[(event->get_event_type())];
-    my_event->event_type = event->get_event_type();
-    my_event->position = (event->header())->log_pos;
+    my_event->set_type(event->get_event_type());
+    my_event->set_position(event->header()->log_pos);
 
-    std::string e_str;
-    char buf[33];
-    e_str = "{\"event\":\"";
-    e_str.append(event_types[(event->get_event_type())] + "\"");
-    sprintf(buf, ", \"position\": %ld", (event->header())->log_pos);
-    e_str.append(buf);
+    if (event->header()->type_code == binary_log::TABLE_MAP_EVENT) {
+        m_handler.handle_event(&event);
+        return ERR_OK;
+    }
 
-    if(event->get_event_type() == binary_log::TABLE_MAP_EVENT ||
-       event->get_event_type() == binary_log::PRE_GA_WRITE_ROWS_EVENT ||
-       event->get_event_type() == binary_log::PRE_GA_UPDATE_ROWS_EVENT ||
-       event->get_event_type() == binary_log::PRE_GA_DELETE_ROWS_EVENT ||
-       event->get_event_type() == binary_log::WRITE_ROWS_EVENT ||
-       event->get_event_type() == binary_log::WRITE_ROWS_EVENT_V1 ||
-       event->get_event_type() == binary_log::UPDATE_ROWS_EVENT ||
-       event->get_event_type() == binary_log::UPDATE_ROWS_EVENT_V1 ||
-       event->get_event_type() == binary_log::DELETE_ROWS_EVENT ||
-       event->get_event_type() == binary_log::DELETE_ROWS_EVENT_V1)
-    {
-        map<int, string>::iterator tb_it;
+    m_handler.handle_event(&event);
 
-        if (event->get_event_type() == binary_log::TABLE_MAP_EVENT) {
-            m_tm_event = static_cast<Table_map_event*>(event);
-            database_dot_table = m_tm_event->get_db_name();
-            database_dot_table.append(".");
-            database_dot_table.append(m_tm_event->get_table_name());
-            m_tid_tname[m_tm_event->get_table_id()]= database_dot_table;
-        } else {
-            // It is a row event
-            Rows_event *row_event= static_cast<Rows_event*>(event);
-            m_tid_tname.begin();
-            tb_it = m_tid_tname.find(row_event->get_table_id());
-            if (tb_it != m_tid_tname.end())
+    if(my_event->is_rows_event()) {
+        for(Row_map::iterator row_it = contentHandler.rows_val.begin();
+            row_it != contentHandler.rows_val.end();
+            ++ row_it)
+        {
+            for(Row_Fields_map::iterator filed_it = row_it->begin();
+                filed_it != row_it->end();
+                ++ filed_it)
             {
-                database_dot_table = tb_it->second;
-                database_dot_table.pop_back();
-                if (row_event->get_flags() == Rows_event::STMT_END_F) {
-                    m_tid_tname.erase(tb_it);
-                }
-            } else {
-                throw new std::runtime_error("can not find db.table");
+                std::cout << filed_it->second << "\t";
             }
-
-            Converter converter;
-            Row_event_set rows(row_event, m_tm_event);
-
-            e_str.append(", \"table\":\"" + database_dot_table + "\"");
-            e_str.append(", \"data\":");
-
-            try {
-                e_str.append("[");
-                Row_event_set::iterator it = rows.begin();
-                do
-                {
-                    Row_of_fields fields = *it;
-                    Row_of_fields_Iterator field_it = fields.begin();
-
-                    e_str.append("[");
-
-                    do {
-                        std::string str;
-                        converter.to(str, *field_it);
-
-                        e_str.append("\"" + str + "\"");
-
-                        if (field_it != fields.end()) {
-                            e_str.append(",");
-                        }
-
-                    } while(++field_it != fields.end());
-
-                    e_str.erase(e_str.end() - 1);
-                    e_str.append("]");
-                    e_str.append(",");
-
-                } while (++it != rows.end());
-            } catch (const std::logic_error& le) {
-                std::cerr << "MySQL Data Type error: " << le.what() << '\n';
-            }
-            e_str.erase(e_str.end() - 1);
-            e_str.append("]");
+            std::cout << std::endl;
         }
-
-        my_event->table = database_dot_table;
     }
-    e_str.append("}");
-    my_event->message = e_str;
 
-    return "OK";
+    if (event->header()->type_code == binary_log::QUERY_EVENT) {
+        binary_log::Query_event *qev = dynamic_cast<binary_log::Query_event *>(event);
+
+        std::cout << "Query = "
+        << qev->query
+        << " DB = "
+        << qev->db
+        << std::endl;
+    }
+
+    delete event;
+
+    return ERR_OK;
 }
 
 MyBinlog::~MyBinlog() {
@@ -212,10 +111,22 @@ MyBinlog::~MyBinlog() {
     m_drv = NULL;
 }
 
-MyBinlog::MyBinlog() {
-
+MyBinlog::MyBinlog(std::string uri) {
+    m_uri = uri;
 }
 
-Binary_log *MyBinlog::get_raw() {
-    return m_binlog;
+int MyBinlog::set_position(unsigned long position, std::string filename) {
+    if(m_drv == NULL) {
+        throw new std::runtime_error("not connected yet");
+    }
+    if (position < MIN_BINLOG_POSITION || position > MAX_BINLOG_POSITION) {
+        throw new std::runtime_error("invalid position");
+    }
+
+    if (filename.empty()) {
+        return m_binlog->set_position(position);
+    } else {
+        return m_binlog->set_position(static_cast<const std::string>(filename), position);
+    }
 }
+

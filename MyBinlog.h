@@ -11,26 +11,37 @@
 using binary_log::system::Binary_log_driver;
 
 #define MAX_BINLOG_SIZE 1073741824
+#define MIN_BINLOG_POSITION 4
 #define MAX_BINLOG_POSITION MAX_BINLOG_SIZE/4
 
 class MyBinlog {
 public:
-    MyBinlog();
+    MyBinlog(std::string uri);
     ~MyBinlog();
 
-    std::string get_event_type_str(Log_event_type type);
-    int get_number_of_events();
-
-    int connect(std::string uri);
+    int connect();
     int disconnect();
-    std::string get_next_event(MyEvent *my_event);
-    Binary_log *get_raw();
+
+    int set_position(unsigned long position, std::string filename = "");
+
+    int get_next_event(MyEvent *my_event);
+
+    const std::string get_filename() const {
+        std::string filename;
+        m_binlog->get_position(filename);
+        return filename;
+    }
+
+    const long get_position() const {
+        return m_binlog->get_position();
+    }
 
 private:
+    std::string m_uri;
     Binary_log_driver *m_drv;
     Binary_log *m_binlog;
-    std::map<int, std::string> m_tid_tname;
-    Table_map_event *m_tm_event;
+    binary_log::Decoder m_decode;
+    Content_stream_handler m_handler;
 };
 
 

@@ -12,14 +12,22 @@ class MyEvent {
 public:
     MyEvent();
     ~MyEvent();
+    bool is_rows_event();
+    int set_type(Log_event_type type);
+    std::string get_type_str();
 
-    bool is_data_affected();
+    unsigned long long int get_position() const {
+        return m_position;
+    }
 
-    std::string event_type_str;
-    Log_event_type event_type;
-    std::string table = "";
-    std::string message = "";
-    unsigned long long position;
+    void set_position(unsigned long long int position) {
+        m_position = position;
+    }
+
+private:
+    Log_event_type m_type;
+    unsigned long long m_position;
+
 };
 
 
